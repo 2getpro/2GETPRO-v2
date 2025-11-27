@@ -592,7 +592,7 @@ setup_database() {
         log "INFO" "Создание пользователя PostgreSQL: ${CONFIG[DB_USER]}"
         print_info "Создание пользователя ${CONFIG[DB_USER]}..."
         
-        if sudo -u postgres psql -w -c "CREATE USER ${CONFIG[DB_USER]} WITH PASSWORD '${CONFIG[DB_PASSWORD]}' ENCRYPTED;" 2>&1 | tee -a "$LOG_FILE"; then
+        if sudo -u postgres psql -w -c "CREATE USER \"${CONFIG[DB_USER]}\" WITH PASSWORD '${CONFIG[DB_PASSWORD]}' ENCRYPTED;" 2>&1 | tee -a "$LOG_FILE"; then
             print_success "Пользователь ${CONFIG[DB_USER]} создан"
             log "SUCCESS" "Пользователь ${CONFIG[DB_USER]} создан успешно"
         else
@@ -612,7 +612,7 @@ setup_database() {
         log "INFO" "Создание базы данных: ${CONFIG[DB_NAME]}"
         print_info "Создание базы данных ${CONFIG[DB_NAME]}..."
         
-        if sudo -u postgres psql -w -c "CREATE DATABASE ${CONFIG[DB_NAME]} OWNER ${CONFIG[DB_USER]};" 2>&1 | tee -a "$LOG_FILE"; then
+        if sudo -u postgres psql -w -c "CREATE DATABASE \"${CONFIG[DB_NAME]}\" OWNER \"${CONFIG[DB_USER]}\";" 2>&1 | tee -a "$LOG_FILE"; then
             print_success "База данных ${CONFIG[DB_NAME]} создана"
             log "SUCCESS" "База данных ${CONFIG[DB_NAME]} создана успешно"
         else
@@ -626,7 +626,7 @@ setup_database() {
     log "INFO" "Настройка прав доступа к базе данных"
     print_info "Настройка прав доступа..."
     
-    if sudo -u postgres psql -w -c "GRANT ALL PRIVILEGES ON DATABASE ${CONFIG[DB_NAME]} TO ${CONFIG[DB_USER]};" 2>&1 | tee -a "$LOG_FILE"; then
+    if sudo -u postgres psql -w -c "GRANT ALL PRIVILEGES ON DATABASE \"${CONFIG[DB_NAME]}\" TO \"${CONFIG[DB_USER]}\";" 2>&1 | tee -a "$LOG_FILE"; then
         log "SUCCESS" "Права доступа настроены"
     else
         print_warning "Возможны проблемы с настройкой прав доступа"
