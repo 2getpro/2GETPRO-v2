@@ -139,20 +139,44 @@ check_ubuntu_version() {
 check_system_requirements() {
     print_step "Проверка системных требований..."
     
-    # Проверка RAM (минимум 4GB для Docker)
+    # Проверка RAM (рекомендуется 4GB для Docker)
     local total_ram=$(free -g | awk '/^Mem:/{print $2}')
-    if [[ $total_ram -lt 4 ]]; then
-        print_error "Недостаточно RAM: ${total_ram}GB (минимум 4GB для Docker)"
+    if [[ $total_ram -lt 2 ]]; then
+        print_error "Недостаточно RAM: ${total_ram}GB (минимум 2GB)"
         exit 1
+    elif [[ $total_ram -lt 4 ]]; then
+        print_warning "RAM: ${total_ram}GB (рекомендуется 4GB для Docker)"
+        print_info "Бот может работать медленнее или нестабильно"
+        
+        if [[ "$SKIP_CONFIRMATIONS" == false ]]; then
+            read -p "Продолжить установку? (y/n): " -n 1 -r
+            echo
+            if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+                print_info "Установка отменена"
+                exit 1
+            fi
+        fi
     else
         print_success "RAM: ${total_ram}GB"
     fi
     
-    # Проверка свободного места на диске (минимум 30GB для Docker)
+    # Проверка свободного места на диске (рекомендуется 30GB для Docker)
     local free_space=$(df -BG / | awk 'NR==2 {print $4}' | sed 's/G//')
-    if [[ $free_space -lt 30 ]]; then
-        print_error "Недостаточно свободного места: ${free_space}GB (минимум 30GB)"
+    if [[ $free_space -lt 10 ]]; then
+        print_error "Недостаточно свободного места: ${free_space}GB (минимум 10GB)"
         exit 1
+    elif [[ $free_space -lt 30 ]]; then
+        print_warning "Свободное место: ${free_space}GB (рекомендуется 30GB)"
+        print_info "Может не хватить места для логов и резервных копий"
+        
+        if [[ "$SKIP_CONFIRMATIONS" == false ]]; then
+            read -p "Продолжить установку? (y/n): " -n 1 -r
+            echo
+            if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+                print_info "Установка отменена"
+                exit 1
+            fi
+        fi
     else
         print_success "Свободное место: ${free_space}GB"
     fi
