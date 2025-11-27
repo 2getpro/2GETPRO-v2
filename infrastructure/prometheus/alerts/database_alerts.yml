@@ -1,0 +1,195 @@
+groups:
+  - name: database_alerts
+    interval: 30s
+    rules:
+      # PostgreSQL доступность
+      - alert: PostgresDown
+        expr: up{job="postgres"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: postgres
+        annotations:
+          summary: "PostgreSQL is down"
+          description: "PostgreSQL instance {{ $labels.instance }} has been down for more than 1 minute"
+          runbook_url: "https://docs.example.com/runbooks/postgres-down"
+      
+      # Соединения
+      - alert: PostgresTooManyConnections
+        expr: sum(pg_stat_activity_count) > (pg_settings_max_connections * 0.8)
+        for: 5m
+        labels:
+          severity: warning
+          component: postgres
+        annotations:
+          summary: "PostgreSQL too many connections"
+          description: "PostgreSQL has {{ $value }} connections (80% of max) on {{ $labels.instance }}"
+          runbook_url: "https://docs.example.com/runbooks/postgres-connections"
+      
+      - alert: PostgresConnectionsExhausted
+        expr: sum(pg_stat_activity_count) >= pg_settings_max_connections
+        for: 1m
+        labels:
+          severity: critical
+          component: postgres
+        annotations:
+          summary: "PostgreSQL connections exhausted"
+          description: "PostgreSQL has reached max connections on {{ $labels.instance }}"
+          runbook_url: "https://docs.example.com/runbooks/postgres-connections-exhausted"
+      
+      - alert: PostgresIdleConnections
+        expr: sum(pg_stat_activity_count{state="idle"}) > 50
+        for: 10m
+        labels:
+          severity: info
+          component: postgres
+        annotations:
+          summary: "PostgreSQL has many idle connections"
+          description: "PostgreSQL has {{ $value }} idle connections on {{ $labels.instance }}"
+      
+      # Производительность
+      - alert: PostgresSlowQueries
+        expr: rate(pg_stat_activity_max_tx_duration{datname!~"template.*"}[5m]) > 60
+        for: 5m
+        labels:
+          severity: warning
+          component: postgres
+        annotations:
+          summary: "PostgreSQL slow queries detected"
+          description: "Slow queries detected on database {{ $labels.datname }} on {{ $labels.instance }}"
+          runbook_url: "https://docs.example.com/runbooks/postgres-slow-queries"
+      
+      - alert: PostgresHighQueryRate
+        expr: rate(pg_stat_database_xact_commit{datname!~"template.*"}[5m]) > 10000
+        for: 5m
+        labels:
+          severity: info
+          component: postgres
+        annotations:
+          summary: "PostgreSQL high query rate"
+          description: "Query rate is {{ $value | humanize }} queries/sec on {{ $labels.datname }}"
+      
+      - alert: PostgresDeadlocks
+        expr: rate(pg_stat_database_deadlocks{datname!~"template.*"}[5m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+          component: postgres
+        annotations:
+          summary: "PostgreSQL deadlocks detected"
+          description: "Deadlocks detected at {{ $value | humanize }} deadlocks/sec on {{ $labels.datname }}"
+          runbook_url: "https://docs.example.com/runbooks/postgres-deadlocks"
+      
+      # Репликация
+      - alert: PostgresReplicationLag
+        expr: pg_replication_lag > 30
+        for: 5m
+        labels:
+          severity: warning
+          component: postgres
+        annotations:
+          summary: "PostgreSQL replication lag"
+          description: "Replication lag is {{ $value }} seconds on {{ $labels.instance }}"
+          runbook_url: "https://docs.example.com/runbooks/postgres-replication-lag"
+      
+      - alert: PostgresReplicationBroken
+        expr: pg_replication_is_replica == 1 and pg_replication_lag > 300
+        for: 5m
+        labels:
+          severity: critical
+          component: postgres
+        annotations:
+          summary: "PostgreSQL replication broken"
+          description: "Replication lag is {{ $value }} seconds on {{ $labels.instance }}. Replication may be broken."
+          runbook_url: "https://docs.example.com/runbooks/postgres-replication-broken"
+      
+      # Хранилище
+      - alert: PostgresHighDiskUsage
+        expr: (pg_database_size_bytes / pg_settings_data_directory_size_bytes) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          component: postgres
+        annotations:
+          summary: "PostgreSQL high disk usage"
+          description: "Database {{ $labels.datname }} is using {{ $value | humanizePercentage }} of available space"
+          runbook_url: "https://docs.example.com/runbooks/postgres-disk-usage"
+      
+      - alert: PostgresTableBloat
+        expr: pg_table_bloat_ratio > 0.3
+        for: 1h
+        labels:
+          severity: warning
+          component: postgres
+        annotations:
+          summary: "PostgreSQL table bloat detected"
+          description: "Table {{ $labels.schemaname }}.{{ $labels.tablename }} has {{ $value | humanizePercentage }} bloat"
+          runbook_url: "https://docs.example.com/runbooks/postgres-bloat"
+      
+      - alert: PostgresIndexBloat
+        expr: pg_index_bloat_ratio > 0.3
+        for: 1h
+        labels:
+          severity: warning
+          component: postgres
+        annotations:
+          summary: "PostgreSQL index bloat detected"
+          description: "Index {{ $labels.schemaname }}.{{ $labels.indexname }} has {{ $value | humanizePercentage }} bloat"
+          runbook_url: "https://docs.example.com/runbooks/postgres-bloat"
+      
+      # WAL и checkpoint
+      - alert: PostgresWALArchiveFailing
+        expr: rate(pg_stat_archiver_failed_count[5m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+          component: postgres
+        annotations:
+          summary: "PostgreSQL WAL archive failing"
+          description: "WAL archiving is failing at {{ $value | humanize }} failures/sec on {{ $labels.instance }}"
+          runbook_url: "https://docs.example.com/runbooks/postgres-wal-archive"
+      
+      - alert: PostgresFrequentCheckpoints
+        expr: rate(pg_stat_bgwriter_checkpoints_req[5m]) > rate(pg_stat_bgwriter_checkpoints_timed[5m])
+        for: 10m
+        labels:
+          severity: warning
+          component: postgres
+        annotations:
+          summary: "PostgreSQL frequent checkpoints"
+          description: "Checkpoints are happening too frequently on {{ $labels.instance }}"
+          runbook_url: "https://docs.example.com/runbooks/postgres-checkpoints"
+      
+      # Кэш
+      - alert: PostgresLowCacheHitRatio
+        expr: rate(pg_stat_database_blks_hit{datname!~"template.*"}[5m]) / (rate(pg_stat_database_blks_hit{datname!~"template.*"}[5m]) + rate(pg_stat_database_blks_read{datname!~"template.*"}[5m])) < 0.9
+        for: 10m
+        labels:
+          severity: warning
+          component: postgres
+        annotations:
+          summary: "PostgreSQL low cache hit ratio"
+          description: "Cache hit ratio is {{ $value | humanizePercentage }} on database {{ $labels.datname }}"
+          runbook_url: "https://docs.example.com/runbooks/postgres-cache-hit"
+      
+      # Vacuum
+      - alert: PostgresVacuumNotRunning
+        expr: time() - pg_stat_user_tables_last_autovacuum > 86400
+        for: 1h
+        labels:
+          severity: warning
+          component: postgres
+        annotations:
+          summary: "PostgreSQL vacuum not running"
+          description: "Table {{ $labels.schemaname }}.{{ $labels.relname }} has not been vacuumed in 24 hours"
+          runbook_url: "https://docs.example.com/runbooks/postgres-vacuum"
+      
+      - alert: PostgresAnalyzeNotRunning
+        expr: time() - pg_stat_user_tables_last_autoanalyze > 86400
+        for: 1h
+        labels:
+          severity: info
+          component: postgres
+        annotations:
+          summary: "PostgreSQL analyze not running"
+          description: "Table {{ $labels.schemaname }}.{{ $labels.relname }} has not been analyzed in 24 hours"

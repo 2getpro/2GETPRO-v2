@@ -1,0 +1,106 @@
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: 2getpro-v2-bot-hpa
+  namespace: 2getpro-v2
+  labels:
+    app: 2getpro-v2
+    component: bot
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: 2getpro-v2-bot
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  - type: Pods
+    pods:
+      metric:
+        name: bot_requests_per_second
+      target:
+        type: AverageValue
+        averageValue: "100"
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 60
+      - type: Pods
+        value: 1
+        periodSeconds: 60
+      selectPolicy: Min
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 30
+      - type: Pods
+        value: 2
+        periodSeconds: 30
+      selectPolicy: Max
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: 2getpro-v2-bot-pdb
+  namespace: 2getpro-v2
+  labels:
+    app: 2getpro-v2
+    component: bot
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: 2getpro-v2
+      component: bot
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: 2getpro-v2-sa
+  namespace: 2getpro-v2
+  labels:
+    app: 2getpro-v2
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: 2getpro-v2-role
+  namespace: 2getpro-v2
+rules:
+- apiGroups: [""]
+  resources: ["configmaps", "secrets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: 2getpro-v2-rolebinding
+  namespace: 2getpro-v2
+subjects:
+- kind: ServiceAccount
+  name: 2getpro-v2-sa
+  namespace: 2getpro-v2
+roleRef:
+  kind: Role
+  name: 2getpro-v2-role
+  apiGroup: rbac.authorization.k8s.io

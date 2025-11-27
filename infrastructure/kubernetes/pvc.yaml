@@ -1,0 +1,169 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: 2getpro-v2-logs-pvc
+  namespace: 2getpro-v2
+  labels:
+    app: 2getpro-v2
+    component: logs
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: standard
+  resources:
+    requests:
+      storage: 20Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: 2getpro-v2-backups-pvc
+  namespace: 2getpro-v2
+  labels:
+    app: 2getpro-v2
+    component: backups
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: standard
+  resources:
+    requests:
+      storage: 100Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: 2getpro-v2-cache-pvc
+  namespace: 2getpro-v2
+  labels:
+    app: 2getpro-v2
+    component: cache
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: fast
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: fast
+provisioner: kubernetes.io/gce-pd
+parameters:
+  type: pd-ssd
+  replication-type: regional-pd
+allowVolumeExpansion: true
+volumeBindingMode: WaitForFirstConsumer
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: 2getpro-v2-backup
+  namespace: 2getpro-v2
+  labels:
+    app: 2getpro-v2
+    component: backup
+spec:
+  schedule: "0 2 * * *"  # Каждый день в 2:00 UTC
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: 2getpro-v2
+            component: backup
+        spec:
+          restartPolicy: OnFailure
+          containers:
+          - name: backup
+            image: postgres:15-alpine
+            command:
+            - /bin/sh
+            - -c
+            - |
+              BACKUP_FILE="/backups/backup-$(date +%Y%m%d-%H%M%S).sql.gz"
+              pg_dump -h $DB_HOST -U $DB_USER -d $DB_NAME | gzip > $BACKUP_FILE
+              echo "Backup created: $BACKUP_FILE"
+              
+              # Удаление старых бэкапов (старше 30 дней)
+              find /backups -name "backup-*.sql.gz" -mtime +30 -delete
+              echo "Old backups cleaned up"
+            env:
+            - name: DB_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: 2getpro-v2-config
+                  key: DB_HOST
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: 2getpro-v2-secrets
+                  key: DB_USER
+            - name: DB_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: 2getpro-v2-config
+                  key: DB_NAME
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: 2getpro-v2-secrets
+                  key: DB_PASSWORD
+            volumeMounts:
+            - name: backups
+              mountPath: /backups
+          volumes:
+          - name: backups
+            persistentVolumeClaim:
+              claimName: 2getpro-v2-backups-pvc
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: 2getpro-v2-log-rotation
+  namespace: 2getpro-v2
+  labels:
+    app: 2getpro-v2
+    component: log-rotation
+spec:
+  schedule: "0 0 * * *"  # Каждый день в полночь UTC
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: 2getpro-v2
+            component: log-rotation
+        spec:
+          restartPolicy: OnFailure
+          containers:
+          - name: log-rotation
+            image: busybox:latest
+            command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Starting log rotation..."
+              
+              # Архивирование логов старше 7 дней
+              find /app/logs -name "*.log" -mtime +7 -exec gzip {} \;
+              
+              # Удаление архивов старше 30 дней
+              find /app/logs -name "*.log.gz" -mtime +30 -delete
+              
+              echo "Log rotation completed"
+            volumeMounts:
+            - name: logs
+              mountPath: /app/logs
+          volumes:
+          - name: logs
+            persistentVolumeClaim:
+              claimName: 2getpro-v2-logs-pvc

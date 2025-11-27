@@ -1,0 +1,163 @@
+groups:
+  - name: infrastructure_alerts
+    interval: 30s
+    rules:
+      # Redis алерты
+      - alert: RedisDown
+        expr: up{job="redis"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: redis
+        annotations:
+          summary: "Redis is down"
+          description: "Redis instance {{ $labels.instance }} has been down for more than 1 minute"
+          runbook_url: "https://docs.example.com/runbooks/redis-down"
+      
+      - alert: RedisHighMemoryUsage
+        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          component: redis
+        annotations:
+          summary: "Redis high memory usage"
+          description: "Redis memory usage is {{ $value | humanizePercentage }} on {{ $labels.instance }}"
+          runbook_url: "https://docs.example.com/runbooks/redis-memory"
+      
+      - alert: RedisHighConnectionCount
+        expr: redis_connected_clients > 1000
+        for: 5m
+        labels:
+          severity: warning
+          component: redis
+        annotations:
+          summary: "Redis high connection count"
+          description: "Redis has {{ $value }} connected clients on {{ $labels.instance }}"
+      
+      - alert: RedisRejectedConnections
+        expr: rate(redis_rejected_connections_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+          component: redis
+        annotations:
+          summary: "Redis rejecting connections"
+          description: "Redis is rejecting connections at {{ $value | humanize }} connections/sec on {{ $labels.instance }}"
+      
+      # Nginx алерты
+      - alert: NginxDown
+        expr: up{job="nginx"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: nginx
+        annotations:
+          summary: "Nginx is down"
+          description: "Nginx instance {{ $labels.instance }} has been down for more than 1 minute"
+          runbook_url: "https://docs.example.com/runbooks/nginx-down"
+      
+      - alert: NginxHighErrorRate
+        expr: rate(nginx_http_requests_total{status=~"5.."}[5m]) / rate(nginx_http_requests_total[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          component: nginx
+        annotations:
+          summary: "Nginx high error rate"
+          description: "Nginx error rate is {{ $value | humanizePercentage }} on {{ $labels.instance }}"
+      
+      - alert: NginxHighConnectionCount
+        expr: nginx_connections_active > 5000
+        for: 5m
+        labels:
+          severity: warning
+          component: nginx
+        annotations:
+          summary: "Nginx high connection count"
+          description: "Nginx has {{ $value }} active connections on {{ $labels.instance }}"
+      
+      # Node/System алерты
+      - alert: HighDiskUsage
+        expr: (node_filesystem_avail_bytes / node_filesystem_size_bytes) < 0.1
+        for: 5m
+        labels:
+          severity: warning
+          component: node
+        annotations:
+          summary: "High disk usage"
+          description: "Disk usage is {{ $value | humanizePercentage }} on {{ $labels.instance }}"
+          runbook_url: "https://docs.example.com/runbooks/high-disk-usage"
+      
+      - alert: CriticalDiskUsage
+        expr: (node_filesystem_avail_bytes / node_filesystem_size_bytes) < 0.05
+        for: 1m
+        labels:
+          severity: critical
+          component: node
+        annotations:
+          summary: "Critical disk usage"
+          description: "Disk usage is {{ $value | humanizePercentage }} on {{ $labels.instance }}"
+          runbook_url: "https://docs.example.com/runbooks/critical-disk-usage"
+      
+      - alert: HighInodeUsage
+        expr: (node_filesystem_files_free / node_filesystem_files) < 0.1
+        for: 5m
+        labels:
+          severity: warning
+          component: node
+        annotations:
+          summary: "High inode usage"
+          description: "Inode usage is {{ $value | humanizePercentage }} on {{ $labels.instance }}"
+      
+      - alert: HighSystemLoad
+        expr: node_load15 / count(node_cpu_seconds_total{mode="idle"}) without (cpu, mode) > 2
+        for: 10m
+        labels:
+          severity: warning
+          component: node
+        annotations:
+          summary: "High system load"
+          description: "System load is {{ $value }} on {{ $labels.instance }}"
+      
+      - alert: OutOfMemory
+        expr: (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) < 0.1
+        for: 5m
+        labels:
+          severity: warning
+          component: node
+        annotations:
+          summary: "System running out of memory"
+          description: "Available memory is {{ $value | humanizePercentage }} on {{ $labels.instance }}"
+          runbook_url: "https://docs.example.com/runbooks/out-of-memory"
+      
+      - alert: HighSwapUsage
+        expr: (node_memory_SwapTotal_bytes - node_memory_SwapFree_bytes) / node_memory_SwapTotal_bytes > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          component: node
+        annotations:
+          summary: "High swap usage"
+          description: "Swap usage is {{ $value | humanizePercentage }} on {{ $labels.instance }}"
+      
+      # Network алерты
+      - alert: HighNetworkErrors
+        expr: rate(node_network_receive_errs_total[5m]) + rate(node_network_transmit_errs_total[5m]) > 10
+        for: 5m
+        labels:
+          severity: warning
+          component: node
+        annotations:
+          summary: "High network errors"
+          description: "Network error rate is {{ $value | humanize }} errors/sec on {{ $labels.instance }}"
+      
+      - alert: HighNetworkDrops
+        expr: rate(node_network_receive_drop_total[5m]) + rate(node_network_transmit_drop_total[5m]) > 10
+        for: 5m
+        labels:
+          severity: warning
+          component: node
+        annotations:
+          summary: "High network packet drops"
+          description: "Network drop rate is {{ $value | humanize }} drops/sec on {{ $labels.instance }}"

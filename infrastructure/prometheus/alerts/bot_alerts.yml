@@ -1,0 +1,192 @@
+groups:
+  - name: bot_alerts
+    interval: 30s
+    rules:
+      # Критические алерты
+      - alert: BotDown
+        expr: up{job="bot"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: bot
+        annotations:
+          summary: "Bot instance is down"
+          description: "Bot instance {{ $labels.instance }} has been down for more than 1 minute"
+          runbook_url: "https://docs.example.com/runbooks/bot-down"
+      
+      - alert: AllBotsDown
+        expr: count(up{job="bot"} == 0) == count(up{job="bot"})
+        for: 30s
+        labels:
+          severity: critical
+          component: bot
+        annotations:
+          summary: "All bot instances are down"
+          description: "All bot instances are down. Service is completely unavailable!"
+          runbook_url: "https://docs.example.com/runbooks/all-bots-down"
+      
+      - alert: HighErrorRate
+        expr: rate(bot_errors_total[5m]) > 10
+        for: 5m
+        labels:
+          severity: warning
+          component: bot
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is {{ $value | humanize }} errors/sec on {{ $labels.instance }}"
+          runbook_url: "https://docs.example.com/runbooks/high-error-rate"
+      
+      - alert: CriticalErrorRate
+        expr: rate(bot_errors_total[5m]) > 50
+        for: 2m
+        labels:
+          severity: critical
+          component: bot
+        annotations:
+          summary: "Critical error rate detected"
+          description: "Error rate is {{ $value | humanize }} errors/sec on {{ $labels.instance }}"
+          runbook_url: "https://docs.example.com/runbooks/critical-error-rate"
+      
+      # Ресурсы
+      - alert: HighMemoryUsage
+        expr: (bot_memory_usage_bytes / bot_memory_limit_bytes) > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          component: bot
+        annotations:
+          summary: "High memory usage"
+          description: "Memory usage is {{ $value | humanizePercentage }} on {{ $labels.instance }}"
+          runbook_url: "https://docs.example.com/runbooks/high-memory"
+      
+      - alert: HighCPUUsage
+        expr: rate(bot_cpu_usage_seconds_total[5m]) > 0.8
+        for: 10m
+        labels:
+          severity: warning
+          component: bot
+        annotations:
+          summary: "High CPU usage"
+          description: "CPU usage is {{ $value | humanizePercentage }} on {{ $labels.instance }}"
+          runbook_url: "https://docs.example.com/runbooks/high-cpu"
+      
+      - alert: MemoryLeak
+        expr: rate(bot_memory_usage_bytes[1h]) > 0
+        for: 2h
+        labels:
+          severity: warning
+          component: bot
+        annotations:
+          summary: "Possible memory leak detected"
+          description: "Memory usage is continuously growing on {{ $labels.instance }}"
+          runbook_url: "https://docs.example.com/runbooks/memory-leak"
+      
+      # Производительность
+      - alert: HighResponseTime
+        expr: histogram_quantile(0.95, rate(bot_request_duration_seconds_bucket[5m])) > 2
+        for: 10m
+        labels:
+          severity: warning
+          component: bot
+        annotations:
+          summary: "High response time"
+          description: "95th percentile response time is {{ $value | humanizeDuration }} on {{ $labels.instance }}"
+          runbook_url: "https://docs.example.com/runbooks/high-response-time"
+      
+      - alert: HighRequestRate
+        expr: rate(bot_requests_total[5m]) > 1000
+        for: 5m
+        labels:
+          severity: info
+          component: bot
+        annotations:
+          summary: "High request rate"
+          description: "Request rate is {{ $value | humanize }} req/sec on {{ $labels.instance }}"
+      
+      - alert: LowRequestRate
+        expr: rate(bot_requests_total[5m]) < 1
+        for: 15m
+        labels:
+          severity: warning
+          component: bot
+        annotations:
+          summary: "Low request rate"
+          description: "Request rate is {{ $value | humanize }} req/sec on {{ $labels.instance }}. Possible issue with webhook or users."
+      
+      # Бизнес-метрики
+      - alert: HighPaymentFailureRate
+        expr: rate(bot_payment_failures_total[10m]) / rate(bot_payment_attempts_total[10m]) > 0.1
+        for: 10m
+        labels:
+          severity: warning
+          component: bot
+        annotations:
+          summary: "High payment failure rate"
+          description: "Payment failure rate is {{ $value | humanizePercentage }} on {{ $labels.instance }}"
+          runbook_url: "https://docs.example.com/runbooks/payment-failures"
+      
+      - alert: NoNewUsers
+        expr: increase(bot_new_users_total[1h]) == 0
+        for: 2h
+        labels:
+          severity: info
+          component: bot
+        annotations:
+          summary: "No new users registered"
+          description: "No new users have registered in the last 2 hours"
+      
+      - alert: HighSubscriptionCancellationRate
+        expr: rate(bot_subscription_cancellations_total[1h]) / rate(bot_subscription_activations_total[1h]) > 0.3
+        for: 1h
+        labels:
+          severity: warning
+          component: bot
+        annotations:
+          summary: "High subscription cancellation rate"
+          description: "Cancellation rate is {{ $value | humanizePercentage }}"
+      
+      # Безопасность
+      - alert: HighRateLimitHits
+        expr: rate(bot_rate_limit_hits_total[5m]) > 100
+        for: 5m
+        labels:
+          severity: warning
+          component: bot
+        annotations:
+          summary: "High rate limit hits"
+          description: "Rate limit is being hit {{ $value | humanize }} times/sec on {{ $labels.instance }}"
+          runbook_url: "https://docs.example.com/runbooks/rate-limit-hits"
+      
+      - alert: SuspiciousActivity
+        expr: rate(bot_failed_auth_attempts_total[5m]) > 10
+        for: 5m
+        labels:
+          severity: warning
+          component: bot
+        annotations:
+          summary: "Suspicious authentication activity"
+          description: "Failed auth attempts: {{ $value | humanize }} attempts/sec on {{ $labels.instance }}"
+          runbook_url: "https://docs.example.com/runbooks/suspicious-activity"
+      
+      # Webhook
+      - alert: WebhookErrors
+        expr: rate(bot_webhook_errors_total[5m]) > 5
+        for: 5m
+        labels:
+          severity: warning
+          component: bot
+        annotations:
+          summary: "High webhook error rate"
+          description: "Webhook error rate is {{ $value | humanize }} errors/sec on {{ $labels.instance }}"
+          runbook_url: "https://docs.example.com/runbooks/webhook-errors"
+      
+      - alert: WebhookTimeout
+        expr: rate(bot_webhook_timeouts_total[5m]) > 1
+        for: 5m
+        labels:
+          severity: warning
+          component: bot
+        annotations:
+          summary: "Webhook timeouts detected"
+          description: "Webhook timeout rate is {{ $value | humanize }} timeouts/sec on {{ $labels.instance }}"
+          runbook_url: "https://docs.example.com/runbooks/webhook-timeouts"

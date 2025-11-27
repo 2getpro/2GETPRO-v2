@@ -1,0 +1,390 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: 2getpro-v2-bot
+  namespace: 2getpro-v2
+  labels:
+    app: 2getpro-v2
+    component: bot
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: 2getpro-v2
+      component: bot
+  template:
+    metadata:
+      labels:
+        app: 2getpro-v2
+        component: bot
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: 2getpro-v2-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: bot
+        image: 2getpro-v2:latest
+        imagePullPolicy: Always
+        ports:
+        - name: webhook
+          containerPort: 8080
+          protocol: TCP
+        - name: metrics
+          containerPort: 9090
+          protocol: TCP
+        - name: health
+          containerPort: 8081
+          protocol: TCP
+        env:
+        # Environment from ConfigMap
+        - name: ENVIRONMENT
+          valueFrom:
+            configMapKeyRef:
+              name: 2getpro-v2-config
+              key: ENVIRONMENT
+        - name: LOG_LEVEL
+          valueFrom:
+            configMapKeyRef:
+              name: 2getpro-v2-config
+              key: LOG_LEVEL
+        - name: DEBUG
+          valueFrom:
+            configMapKeyRef:
+              name: 2getpro-v2-config
+              key: DEBUG
+        
+        # Bot settings
+        - name: BOT_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: 2getpro-v2-secrets
+              key: BOT_TOKEN
+        - name: BOT_WEBHOOK_ENABLED
+          valueFrom:
+            configMapKeyRef:
+              name: 2getpro-v2-config
+              key: BOT_WEBHOOK_ENABLED
+        - name: BOT_WEBHOOK_PATH
+          valueFrom:
+            configMapKeyRef:
+              name: 2getpro-v2-config
+              key: BOT_WEBHOOK_PATH
+        - name: BOT_WEBHOOK_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: 2getpro-v2-config
+              key: BOT_WEBHOOK_PORT
+        - name: WEBHOOK_URL
+          valueFrom:
+            secretKeyRef:
+              name: 2getpro-v2-secrets
+              key: WEBHOOK_URL
+        
+        # Database settings
+        - name: DB_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: 2getpro-v2-config
+              key: DB_HOST
+        - name: DB_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: 2getpro-v2-config
+              key: DB_PORT
+        - name: DB_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: 2getpro-v2-config
+              key: DB_NAME
+        - name: DB_USER
+          valueFrom:
+            secretKeyRef:
+              name: 2getpro-v2-secrets
+              key: DB_USER
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: 2getpro-v2-secrets
+              key: DB_PASSWORD
+        
+        # Redis settings
+        - name: REDIS_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: 2getpro-v2-config
+              key: REDIS_HOST
+        - name: REDIS_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: 2getpro-v2-config
+              key: REDIS_PORT
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: 2getpro-v2-secrets
+              key: REDIS_PASSWORD
+        
+        # Payment settings
+        - name: YOOKASSA_SHOP_ID
+          valueFrom:
+            secretKeyRef:
+              name: 2getpro-v2-secrets
+              key: YOOKASSA_SHOP_ID
+        - name: YOOKASSA_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: 2getpro-v2-secrets
+              key: YOOKASSA_SECRET_KEY
+        
+        # Monitoring settings
+        - name: SENTRY_DSN
+          valueFrom:
+            secretKeyRef:
+              name: 2getpro-v2-secrets
+              key: SENTRY_DSN
+        - name: METRICS_ENABLED
+          valueFrom:
+            configMapKeyRef:
+              name: 2getpro-v2-config
+              key: METRICS_ENABLED
+        
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+          limits:
+            cpu: 1000m
+            memory: 2Gi
+        
+        livenessProbe:
+          httpGet:
+            path: /health/live
+            port: health
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+        
+        readinessProbe:
+          httpGet:
+            path: /health/ready
+            port: health
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          successThreshold: 1
+          failureThreshold: 3
+        
+        startupProbe:
+          httpGet:
+            path: /health/startup
+            port: health
+          initialDelaySeconds: 0
+          periodSeconds: 5
+          timeoutSeconds: 3
+          successThreshold: 1
+          failureThreshold: 30
+        
+        volumeMounts:
+        - name: logs
+          mountPath: /app/logs
+        - name: cache
+          mountPath: /app/cache
+        - name: tmp
+          mountPath: /tmp
+      
+      volumes:
+      - name: logs
+        persistentVolumeClaim:
+          claimName: 2getpro-v2-logs-pvc
+      - name: cache
+        emptyDir:
+          sizeLimit: 1Gi
+      - name: tmp
+        emptyDir:
+          sizeLimit: 500Mi
+      
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - 2getpro-v2
+              topologyKey: kubernetes.io/hostname
+      
+      terminationGracePeriodSeconds: 30
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: 2getpro-v2
+  labels:
+    app: postgres
+spec:
+  serviceName: postgres-service
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:15-alpine
+        ports:
+        - name: postgres
+          containerPort: 5432
+        env:
+        - name: POSTGRES_DB
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secrets
+              key: POSTGRES_DB
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secrets
+              key: POSTGRES_USER
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secrets
+              key: POSTGRES_PASSWORD
+        - name: PGDATA
+          value: /var/lib/postgresql/data/pgdata
+        resources:
+          requests:
+            cpu: 1000m
+            memory: 2Gi
+          limits:
+            cpu: 2000m
+            memory: 4Gi
+        volumeMounts:
+        - name: postgres-data
+          mountPath: /var/lib/postgresql/data
+        - name: postgres-backups
+          mountPath: /backups
+        livenessProbe:
+          exec:
+            command:
+            - pg_isready
+            - -U
+            - $(POSTGRES_USER)
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          exec:
+            command:
+            - pg_isready
+            - -U
+            - $(POSTGRES_USER)
+          initialDelaySeconds: 5
+          periodSeconds: 5
+  volumeClaimTemplates:
+  - metadata:
+      name: postgres-data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      storageClassName: standard
+      resources:
+        requests:
+          storage: 50Gi
+  - metadata:
+      name: postgres-backups
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      storageClassName: standard
+      resources:
+        requests:
+          storage: 100Gi
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: redis
+  namespace: 2getpro-v2
+  labels:
+    app: redis
+spec:
+  serviceName: redis-service
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+      - name: redis
+        image: redis:7-alpine
+        ports:
+        - name: redis
+          containerPort: 6379
+        command:
+        - redis-server
+        - --appendonly
+        - "yes"
+        - --requirepass
+        - $(REDIS_PASSWORD)
+        env:
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: redis-secrets
+              key: REDIS_PASSWORD
+        resources:
+          requests:
+            cpu: 250m
+            memory: 512Mi
+          limits:
+            cpu: 500m
+            memory: 1Gi
+        volumeMounts:
+        - name: redis-data
+          mountPath: /data
+        livenessProbe:
+          exec:
+            command:
+            - redis-cli
+            - ping
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          exec:
+            command:
+            - redis-cli
+            - ping
+          initialDelaySeconds: 5
+          periodSeconds: 5
+  volumeClaimTemplates:
+  - metadata:
+      name: redis-data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      storageClassName: standard
+      resources:
+        requests:
+          storage: 10Gi

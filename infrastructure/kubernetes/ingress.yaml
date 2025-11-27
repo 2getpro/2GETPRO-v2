@@ -1,0 +1,157 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: 2getpro-v2-webhook-ingress
+  namespace: 2getpro-v2
+  labels:
+    app: 2getpro-v2
+  annotations:
+    # SSL/TLS
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    kubernetes.io/tls-acme: "true"
+    
+    # Nginx specific
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/ssl-protocols: "TLSv1.2 TLSv1.3"
+    nginx.ingress.kubernetes.io/ssl-ciphers: "HIGH:!aNULL:!MD5"
+    
+    # Rate limiting
+    nginx.ingress.kubernetes.io/limit-rps: "10"
+    nginx.ingress.kubernetes.io/limit-burst-multiplier: "2"
+    nginx.ingress.kubernetes.io/limit-connections: "100"
+    
+    # Security headers
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      more_set_headers "X-Frame-Options: SAMEORIGIN";
+      more_set_headers "X-Content-Type-Options: nosniff";
+      more_set_headers "X-XSS-Protection: 1; mode=block";
+      more_set_headers "Strict-Transport-Security: max-age=31536000; includeSubDomains";
+      more_set_headers "Referrer-Policy: strict-origin-when-cross-origin";
+    
+    # Timeouts
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    
+    # Body size
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    
+    # Backend protocol
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+    
+    # Load balancing
+    nginx.ingress.kubernetes.io/load-balance: "least_conn"
+    
+    # Whitelist (опционально - раскомментируйте и укажите IP Telegram)
+    # nginx.ingress.kubernetes.io/whitelist-source-range: "149.154.160.0/20,91.108.4.0/22"
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - webhook.example.com
+    secretName: 2getpro-v2-tls-cert
+  rules:
+  - host: webhook.example.com
+    http:
+      paths:
+      - path: /webhook
+        pathType: Prefix
+        backend:
+          service:
+            name: 2getpro-v2-bot-service
+            port:
+              number: 8080
+      - path: /health
+        pathType: Prefix
+        backend:
+          service:
+            name: 2getpro-v2-bot-service
+            port:
+              number: 8081
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: 2getpro-v2-grafana-ingress
+  namespace: 2getpro-v2
+  labels:
+    app: grafana
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    
+    # Basic auth (опционально)
+    # nginx.ingress.kubernetes.io/auth-type: basic
+    # nginx.ingress.kubernetes.io/auth-secret: grafana-basic-auth
+    # nginx.ingress.kubernetes.io/auth-realm: 'Authentication Required'
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - grafana.example.com
+    secretName: grafana-tls-cert
+  rules:
+  - host: grafana.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: grafana-service
+            port:
+              number: 3000
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: 2getpro-v2-network-policy
+  namespace: 2getpro-v2
+spec:
+  podSelector:
+    matchLabels:
+      app: 2getpro-v2
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    ports:
+    - protocol: TCP
+      port: 8080
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    ports:
+    - protocol: TCP
+      port: 9090
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: postgres
+    ports:
+    - protocol: TCP
+      port: 5432
+  - to:
+    - podSelector:
+        matchLabels:
+          app: redis
+    ports:
+    - protocol: TCP
+      port: 6379
+  - to:
+    - namespaceSelector: {}
+    ports:
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 53
+    - protocol: UDP
+      port: 53

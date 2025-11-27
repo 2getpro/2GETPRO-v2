@@ -1,0 +1,5 @@
+# Установка прав на выполнение для bash-скриптов
+*.sh text eol=lf
+install.sh export-subst
+uninstall.sh export-subst
+update.sh export-subst

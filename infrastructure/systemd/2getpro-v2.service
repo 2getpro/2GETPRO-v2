@@ -1,0 +1,64 @@
+[Unit]
+Description=2GETPRO v2 Telegram Bot
+Documentation=https://github.com/your-org/2getpro-v2
+After=network-online.target postgresql.service redis.service
+Wants=network-online.target
+Requires=postgresql.service redis.service
+
+[Service]
+Type=simple
+User=2getpro
+Group=2getpro
+WorkingDirectory=/opt/2getpro-v2
+
+# Environment
+Environment="PATH=/opt/2getpro-v2/venv/bin:/usr/local/bin:/usr/bin:/bin"
+Environment="PYTHONUNBUFFERED=1"
+Environment="PYTHONPATH=/opt/2getpro-v2"
+EnvironmentFile=/opt/2getpro-v2/.env.production
+
+# Security
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/2getpro-v2/logs /var/log/2getpro
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictRealtime=true
+RestrictNamespaces=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=4096
+MemoryMax=2G
+CPUQuota=100%
+
+# Execution
+ExecStartPre=/opt/2getpro-v2/scripts/pre-start.sh
+ExecStart=/opt/2getpro-v2/venv/bin/python /opt/2getpro-v2/main.py
+ExecReload=/bin/kill -HUP $MAINPID
+ExecStop=/opt/2getpro-v2/scripts/graceful-stop.sh
+TimeoutStartSec=60
+TimeoutStopSec=30
+
+# Restart policy
+Restart=always
+RestartSec=10
+StartLimitInterval=300
+StartLimitBurst=5
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=2getpro-v2
+
+# Watchdog
+WatchdogSec=60
+
+[Install]
+WantedBy=multi-user.target
