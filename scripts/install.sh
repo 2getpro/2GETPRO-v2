@@ -643,20 +643,71 @@ setup_database() {
     log "INFO" "Проверка подключения к базе данных"
     print_info "Проверка подключения к базе данных..."
     
-    if PGPASSWORD="${CONFIG[DB_PASSWORD]}" psql -h localhost -U "${CONFIG[DB_USER]}" -d "${CONFIG[DB_NAME]}" -w -c "SELECT 1;" &>/dev/null; then
-        print_success "Подключение к базе данных успешно"
-        log "SUCCESS" "Подключение к базе данных ${CONFIG[DB_NAME]} успешно"
-        return 0
-    else
-        print_error "Не удалось подключиться к базе данных"
-        log "ERROR" "Не удалось подключиться к базе данных ${CONFIG[DB_NAME]}"
-        print_info "Проверьте настройки PostgreSQL: /etc/postgresql/*/main/pg_hba.conf"
-        print_info "Попробуйте выполнить вручную:"
-        print_info "  sudo nano /etc/postgresql/*/main/pg_hba.conf"
-        print_info "  Добавьте строку: host    ${CONFIG[DB_NAME]}    ${CONFIG[DB_USER]}    127.0.0.1/32    scram-sha-256"
-        print_info "  sudo systemctl reload postgresql"
+    # Даём дополнительное время на применение изменений
+    sleep 3
+    
+    # Диагностика перед проверкой
+    log "INFO" "Диагностика PostgreSQL:"
+    log "INFO" "- Пользователь: ${CONFIG[DB_USER]}"
+    log "INFO" "- База данных: ${CONFIG[DB_NAME]}"
+    
+    # Проверяем, что пользователь существует
+    if ! sudo -u postgres psql -w -tAc "SELECT 1 FROM pg_roles WHERE rolname='${CONFIG[DB_USER]}'" 2>/dev/null | grep -q 1; then
+        print_error "Пользователь ${CONFIG[DB_USER]} не найден в PostgreSQL"
+        log "ERROR" "Пользователь ${CONFIG[DB_USER]} не существует"
         return 1
     fi
+    
+    # Проверяем, что база данных существует
+    if ! sudo -u postgres psql -w -lqt 2>/dev/null | cut -d \| -f 1 | grep -qw "${CONFIG[DB_NAME]}"; then
+        print_error "База данных ${CONFIG[DB_NAME]} не найдена"
+        log "ERROR" "База данных ${CONFIG[DB_NAME]} не существует"
+        return 1
+    fi
+    
+    # Пробуем подключиться несколько раз
+    local max_attempts=3
+    local attempt=1
+    
+    while [[ $attempt -le $max_attempts ]]; do
+        log "INFO" "Попытка подключения $attempt из $max_attempts"
+        
+        if PGPASSWORD="${CONFIG[DB_PASSWORD]}" psql -h localhost -U "${CONFIG[DB_USER]}" -d "${CONFIG[DB_NAME]}" -w -c "SELECT 1;" 2>&1 | tee -a "$LOG_FILE" | grep -q "1 row"; then
+            print_success "Подключение к базе данных успешно"
+            log "SUCCESS" "Подключение к базе данных ${CONFIG[DB_NAME]} успешно"
+            return 0
+        fi
+        
+        if [[ $attempt -lt $max_attempts ]]; then
+            print_warning "Попытка $attempt не удалась, повторяем через 2 секунды..."
+            sleep 2
+        fi
+        
+        ((attempt++))
+    done
+    
+    # Если все попытки не удались, выводим диагностику
+    print_error "Не удалось подключиться к базе данных после $max_attempts попыток"
+    log "ERROR" "Не удалось подключиться к базе данных ${CONFIG[DB_NAME]}"
+    
+    print_info ""
+    print_info "Диагностическая информация:"
+    print_info "1. Проверьте, что пользователь существует:"
+    print_info "   sudo -u postgres psql -c \"\\du ${CONFIG[DB_USER]}\""
+    print_info ""
+    print_info "2. Проверьте, что база данных существует:"
+    print_info "   sudo -u postgres psql -l | grep ${CONFIG[DB_NAME]}"
+    print_info ""
+    print_info "3. Проверьте настройки аутентификации:"
+    print_info "   sudo cat /etc/postgresql/16/main/pg_hba.conf | grep ${CONFIG[DB_NAME]}"
+    print_info ""
+    print_info "4. Попробуйте подключиться вручную:"
+    print_info "   PGPASSWORD='${CONFIG[DB_PASSWORD]}' psql -h localhost -U ${CONFIG[DB_USER]} -d ${CONFIG[DB_NAME]}"
+    print_info ""
+    print_info "5. Проверьте логи PostgreSQL:"
+    print_info "   sudo tail -50 /var/log/postgresql/postgresql-16-main.log"
+    
+    return 1
 }
 
 ################################################################################
