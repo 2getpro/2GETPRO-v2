@@ -592,7 +592,7 @@ setup_database() {
         log "INFO" "Создание пользователя PostgreSQL: ${CONFIG[DB_USER]}"
         print_info "Создание пользователя ${CONFIG[DB_USER]}..."
         
-        if sudo -u postgres psql -w -c "CREATE USER \"${CONFIG[DB_USER]}\" WITH PASSWORD '${CONFIG[DB_PASSWORD]}' ENCRYPTED;" 2>&1 | tee -a "$LOG_FILE"; then
+        if sudo -u postgres psql -w -c "CREATE USER \"${CONFIG[DB_USER]}\" WITH PASSWORD '${CONFIG[DB_PASSWORD]}';" 2>&1 | tee -a "$LOG_FILE"; then
             print_success "Пользователь ${CONFIG[DB_USER]} создан"
             log "SUCCESS" "Пользователь ${CONFIG[DB_USER]} создан успешно"
         else
