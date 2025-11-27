@@ -41,7 +41,7 @@ python-dateutil>=2.8.2
 pytz>=2023.3
 
 # Payment Systems (from 2GETPRO)
-aiocryptopay>=0.5.0
+aiocryptopay>=0.4.0,<0.5.0
 yookassa>=2.3.0
 
 # Logging
