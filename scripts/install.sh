@@ -832,6 +832,12 @@ install_dependencies() {
         return
     fi
     
+    # Создаём лог-файл с правильными правами, если его нет
+    if [[ ! -f "$LOG_FILE" ]]; then
+        touch "$LOG_FILE"
+        chmod 666 "$LOG_FILE"
+    fi
+    
     sudo -u "$SYSTEM_USER" bash -c "
         cd '$PROJECT_DIR'
         source venv/bin/activate
