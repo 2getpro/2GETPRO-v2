@@ -1463,6 +1463,21 @@ EOF
         fi
     fi
     
+    # Генерация конфигурации СРАЗУ после сбора данных
+    print_header "СОХРАНЕНИЕ КОНФИГУРАЦИИ"
+    
+    # Создаём директорию для .env если её ещё нет
+    if [[ ! -d "$PROJECT_DIR" ]]; then
+        mkdir -p "$PROJECT_DIR"
+        log "INFO" "Создана директория $PROJECT_DIR"
+    fi
+    
+    # Генерируем .env файл сразу, чтобы сохранить введённые данные
+    generate_env_file
+    print_success "Конфигурация сохранена в $PROJECT_DIR/$ENV_FILE"
+    print_info "Даже если установка прервётся, ваши настройки сохранены!"
+    echo
+    
     # Установка компонентов
     print_header "УСТАНОВКА КОМПОНЕНТОВ"
     
@@ -1488,9 +1503,16 @@ EOF
     create_virtualenv
     install_dependencies
     
-    # Генерация конфигурации
-    print_header "ГЕНЕРАЦИЯ КОНФИГУРАЦИИ"
-    generate_env_file
+    # Обновление конфигурации (если были изменения в процессе установки)
+    print_header "ОБНОВЛЕНИЕ КОНФИГУРАЦИИ"
+    print_info "Проверка актуальности конфигурации..."
+    
+    # Обновляем права доступа к .env файлу
+    if [[ -f "$PROJECT_DIR/$ENV_FILE" ]]; then
+        chown "$SYSTEM_USER:$SYSTEM_USER" "$PROJECT_DIR/$ENV_FILE"
+        chmod 600 "$PROJECT_DIR/$ENV_FILE"
+        print_success "Права доступа к конфигурации обновлены"
+    fi
     
     # Настройка systemd
     print_header "НАСТРОЙКА SYSTEMD"
