@@ -32,7 +32,7 @@
 ssh root@your-server-ip
 
 # 2. Скачайте проект
-git clone https://github.com/2getpro/2GETPRO-v2.git /opt/2getpro-v2
+git clone https://github.com/2getpro/2getpro-v2.git
 cd /opt/2getpro-v2
 
 # 3. Запустите Docker установщик
@@ -67,7 +67,7 @@ Docker установщик автоматически:
 ssh root@your-server-ip
 
 # 2. Скачайте проект
-git clone https://github.com/2getpro/2GETPRO-v2.git
+git clone https://github.com/2getpro/2getpro-v2.git
 cd /opt/2getpro-v2
 
 chmod +x scripts/install.sh
