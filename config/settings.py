@@ -87,7 +87,7 @@ class Settings(BaseSettings):
     FREEKASSA_PAYMENT_URL: str = Field(default="https://pay.freekassa.ru/")
     FREEKASSA_API_KEY: Optional[str] = None
     FREEKASSA_PAYMENT_IP: Optional[str] = None
-    FREEKASSA_PAYMENT_METHOD_ID: Optional[int] = None
+    FREEKASSA_PAYMENT_METHOD_ID: Optional[int] = Field(default=None, description="FreeKassa payment method ID (optional)")
 
     YOOKASSA_ENABLED: bool = Field(default=True)
     STARS_ENABLED: bool = Field(default=True)
@@ -416,7 +416,7 @@ class Settings(BaseSettings):
     LOG_CHAT_ID: Optional[int] = Field(default=None, description="Telegram chat/group ID for sending notifications")
     LOG_THREAD_ID: Optional[int] = Field(default=None, description="Thread ID for supergroup messages (optional)")
     
-    @field_validator('LOG_CHAT_ID', 'LOG_THREAD_ID', mode='before')
+    @field_validator('LOG_CHAT_ID', 'LOG_THREAD_ID', 'FREEKASSA_PAYMENT_METHOD_ID', mode='before')
     @classmethod
     def validate_optional_int_fields(cls, v):
         """Convert empty strings to None for optional integer fields"""
